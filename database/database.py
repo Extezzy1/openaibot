@@ -72,3 +72,20 @@ class Database:
     def update_voice_id(self, bot_id, voice_id):
         with self.connection:
             self.cursor.execute("UPDATE bots SET voice_id = ? WHERE bot_id = ?", (voice_id, bot_id))
+
+    def add_rate(self, bot_id, count_minutes, price):
+        with self.connection:
+            self.cursor.execute("INSERT INTO rates (bot_id, count_minutes, price) VALUES (?, ?, ?)", (bot_id, count_minutes, price))
+
+    def update_rate(self, rate_id, count_minutes, price):
+        with self.connection:
+            self.cursor.execute("UPDATE rates SET count_minutes = ?, price = ? WHERE rate_id = ?",
+                                (count_minutes, price, rate_id))
+
+    def get_all_rates_by_bot_id(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT * FROM rates WHERE bot_id = ?", (bot_id, )).fetchall()
+
+    def delete_rate(self, rate_id):
+        with self.connection:
+            self.cursor.execute("DELETE FROM rates WHERE rate_id = ?", (rate_id, ))

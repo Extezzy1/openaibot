@@ -42,6 +42,87 @@ async def start(message: Message):
         await message.answer("Привет!", reply_markup=admin_markup.create_start_markup())
 
 
+@commands_router.message(FSM.FSMAdmin.get_count_minutes)
+async def get_count_minutes(message: Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    await bot.delete_message(message.from_user.id, data["msg_id"])
+    await message.delete()
+    count_minutes = message.text
+    if count_minutes.isdigit():
+        msg = await message.answer("Отлично, теперь пришли мне цену на данный тариф", reply_markup=admin_markup.create_markup_rate_back())
+        data["msg_id"] = msg.message_id
+        data["count_minutes"] = count_minutes
+        await state.set_state(FSM.FSMAdmin.get_price)
+    else:
+        msg = await message.answer("Количество минут должно быть целым числом, повтори ввод", reply_markup=admin_markup.create_markup_rate_back())
+        data["msg_id"] = msg.message_id
+    await state.set_data(data)
+
+
+@commands_router.message(FSM.FSMAdmin.get_price)
+async def get_price_rate(message: Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    await bot.delete_message(message.from_user.id, data["msg_id"])
+    await message.delete()
+    price = message.text
+    if price.isdigit():
+        count_minutes = data["count_minutes"]
+        bot_id = data["token"].split(":")[0]
+        db.add_rate(bot_id, count_minutes, price)
+        rates = db.get_all_rates_by_bot_id(bot_id)
+        current_rates = ""
+        for rate in rates:
+            current_rates += f"{rate[2]} минут - {rate[3]}₽\n"
+        await message.answer(f"Успешно добавил тариф!\n\nТекущие тарифы:\n{current_rates}", reply_markup=admin_markup.create_markup_rates(bot_id))
+        await state.set_state(FSM.FSMAdmin.get_rates)
+    else:
+        msg = await message.answer("Количество минут должно быть целым числом, повтори ввод", reply_markup=admin_markup.create_markup_rate_back())
+        data["msg_id"] = msg.message_id
+        await state.set_data(data)
+
+
+@commands_router.message(FSM.FSMAdmin.get_new_count_minutes)
+async def get_new_count_minutes(message: Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    await bot.delete_message(message.from_user.id, data["msg_id"])
+    await message.delete()
+    count_minutes = message.text
+    if count_minutes.isdigit():
+        msg = await message.answer("Отлично, теперь пришли мне новую цену на данный тариф")
+        data = await state.get_data()
+        data["msg_id"] = msg.message_id
+        data["count_minutes"] = count_minutes
+        await state.set_state(FSM.FSMAdmin.get_new_price)
+    else:
+        msg = await message.answer("Количество минут должно быть целым числом, повтори ввод")
+        data["msg_id"] = msg.message_id
+    await state.set_data(data)
+
+
+@commands_router.message(FSM.FSMAdmin.get_new_price)
+async def get_new_price(message: Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    await bot.delete_message(message.from_user.id, data["msg_id"])
+    await message.delete()
+    price = message.text
+    if price.isdigit():
+        data = await state.get_data()
+        count_minutes = data["count_minutes"]
+        bot_id = data["token"].split(":")[0]
+        rate_id = data["edit_rate_id"]
+        db.update_rate(rate_id, count_minutes, price)
+        rates = db.get_all_rates_by_bot_id(bot_id)
+        current_rates = ""
+        for rate in rates:
+            current_rates += f"{rate[2]} минут - {rate[3]}₽\n"
+        await message.answer(f"Успешно обновил тариф!\n\nТекущие тарифы:\n{current_rates}", reply_markup=admin_markup.create_markup_rates(bot_id))
+        await state.set_state(FSM.FSMAdmin.get_rates)
+    else:
+        msg = await message.answer("Количество минут должно быть целым числом, повтори ввод")
+        data["msg_id"] = msg.message_id
+        await state.set_data(data)
+
+
 @commands_router.message(FSM.FSMAdmin.get_prompt)
 async def get_prompt(message: Message, state: FSMContext):
 
@@ -73,19 +154,22 @@ async def get_voice(message: Message, state: FSMContext, bot: Bot):
         token = data["token"]
         bot_id = token.split(":")[0]
 
-        voice_id = elevenlab.add_voice(f"voice_{bot_id}", file_name)
-
+        # voice_id = elevenlab.add_voice(f"voice_{bot_id}", file_name)
+        voice_id = "123"
         os.remove(file_name)
+        await state.set_data(data)
+
         prompt = data["prompt"]
         token_yoomoney = data["token_yoomoney"]
-
         result, username, bot_id = await add_bot(token, dp_new_bot, polling_manager)
         if bot_id:
-            db.add_bot(bot_id, token, username, "не запущен", prompt, voice_id, token_yoomoney)
-            db.update_status_bot(message.text, "запущен")
-            # db.add_row(bot_id, message.from_user.id, "system", prompt)
-        await message.answer(result, reply_markup=admin_markup.create_start_markup())
-        await state.clear()
+            db.add_bot(bot_id, token, username, "запущен", prompt, voice_id, token_yoomoney)
+        await message.answer(result)
+        await state.set_state(FSM.FSMAdmin.get_rates)
+        await message.answer("Теперь давай настроим тарифы", reply_markup=admin_markup.create_markup_rates(bot_id))
+
+        #     # db.add_row(bot_id, message.from_user.id, "system", prompt)
+        # await state.clear()
 
 
 @commands_router.message(FSM.FSMAdmin.get_token_bot)
