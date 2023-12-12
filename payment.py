@@ -35,12 +35,9 @@ class Payment:
         for operation in history.operations:
             if operation.label == bill:
                 if operation.status == 'success':
-                    return 'Оплачено'
+                    return 'Оплачено', round(operation.amount)
                 elif operation.status == 'in_progress':
-                    return 'Ожидает оплаты'
+                    return 'Ожидает оплаты', 0
                 else:
-                    return '?'
-
-
-
-wallet = Payment(config.yoomoney_wallet, config.yoomoney_token)
+                    return '?', 0
+        return "?", 0

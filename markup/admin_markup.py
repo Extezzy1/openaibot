@@ -23,6 +23,7 @@ def create_markup_start_stop_bot(status, bot_id):
     kb.append([types.InlineKeyboardButton(text="Изменить промпт", callback_data=f"edit_prompt_{bot_id}")])
     kb.append([types.InlineKeyboardButton(text="Изменить токен yoomoney", callback_data=f"edit_yoomoney_token_{bot_id}")])
     kb.append([types.InlineKeyboardButton(text="Изменить голос", callback_data=f"edit_voice_{bot_id}")],)
+    kb.append([types.InlineKeyboardButton(text="Изменить цену за одну минуту", callback_data=f"edit_price_per_minute_{bot_id}")],)
     kb.append([types.InlineKeyboardButton(text="Изменить тарифы", callback_data=f"edit_main_rates_{bot_id}")],)
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=kb)
     return keyboard

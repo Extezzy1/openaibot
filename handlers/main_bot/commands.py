@@ -21,11 +21,11 @@ async def on_startup_load_bots(bot: Bot):
     bots = db.get_active_bots()
     for bot_ in bots:
         if bot_[3] == "запущен":
-            for admin in config.ADMINS:
-                try:
-                    await bot.send_message(admin, f"Бот [{bot_[2]}] успешно запущен!")
-                except:
-                    pass
+            # for admin in config.ADMINS:
+            #     try:
+            #         await bot.send_message(admin, f"Бот [{bot_[2]}] успешно запущен!")
+            #     except:
+            #         pass
             db.update_status_bot(bot_[1], "запущен")
             await add_bot(bot_[1], dp_new_bot, polling_manager)
 
@@ -161,9 +161,10 @@ async def get_voice(message: Message, state: FSMContext, bot: Bot):
 
         prompt = data["prompt"]
         token_yoomoney = data["token_yoomoney"]
+        price_per_minute = data["price_per_minute"]
         result, username, bot_id = await add_bot(token, dp_new_bot, polling_manager)
         if bot_id:
-            db.add_bot(bot_id, token, username, "запущен", prompt, voice_id, token_yoomoney)
+            db.add_bot(bot_id, token, username, "запущен", prompt, voice_id, token_yoomoney, price_per_minute)
         await message.answer(result)
         await state.set_state(FSM.FSMAdmin.get_rates)
         await message.answer("Теперь давай настроим тарифы", reply_markup=admin_markup.create_markup_rates(bot_id))
@@ -179,11 +180,22 @@ async def get_token_bot(message: Message, state: FSMContext):
         data["token"] = message.text
 
         await state.set_data(data)
-        await state.set_state(FSM.FSMAdmin.get_yoomoney_token)
-        await message.answer("Пришли мне токен yoomoney для персонажа")
+
+        await state.set_state(FSM.FSMAdmin.get_price_per_minute)
+        await message.answer("Пришли мне цену за одну минуту сообщения персонажа")
+
 
     else:
         await message.answer("Токен не прошел проверку, повтори попытку")
+
+
+@commands_router.message(FSM.FSMAdmin.get_price_per_minute)
+async def get_price_per_minute(message: Message, state: FSMContext):
+    data = await state.get_data()
+    data["price_per_minute"] = message.text
+    await state.set_data(data)
+    await state.set_state(FSM.FSMAdmin.get_yoomoney_token)
+    await message.answer("Пришли мне токен yoomoney для персонажа")
 
 
 @commands_router.message(FSM.FSMAdmin.get_yoomoney_token)
@@ -212,6 +224,29 @@ async def get_new_prompt(message: Message, state: FSMContext):
         for bot in bots:
             if bot[0] == data['bot_id']:
                 msg = f"<i>Промпт успешно изменен</i>\n\n[{bot[3]}] - @{bot[2]}\n"
+                await message.answer(msg, reply_markup=admin_markup.create_markup_start_stop_bot(bot[3], bot[0]), parse_mode='HTML')
+    await state.clear()
+    await message.answer('Главное меню', reply_markup=admin_markup.create_start_markup())
+
+
+@commands_router.message(FSM.FSMAdmin.get_new_price_per_minute)
+async def get_new_price_per_minute(message: Message, state: FSMContext):
+    if message.text == replicas.cancel:
+        data = await state.get_data()
+        bots = db.get_bots()
+        for bot in bots:
+            if bot[0] == data['bot_id']:
+                msg = f"<i>Изменение токена yoomoney отменено</i>\n\n[{bot[3]}] - @{bot[2]}\n"
+                await message.answer(msg, reply_markup=admin_markup.create_markup_start_stop_bot(bot[3], bot[0]),
+                                     parse_mode='HTML')
+    else:
+        data = await state.get_data()
+        db.update_price_per_minute(data["bot_id"], message.text)
+        # await message.answer("Успешно изменил токен yoomoney", reply_markup=admin_markup.create_start_markup())
+        bots = db.get_bots()
+        for bot in bots:
+            if bot[0] == data['bot_id']:
+                msg = f"<i>Цена за минуту сообщения успешна изменена</i>\n\n[{bot[3]}] - @{bot[2]}\n"
                 await message.answer(msg, reply_markup=admin_markup.create_markup_start_stop_bot(bot[3], bot[0]), parse_mode='HTML')
     await state.clear()
     await message.answer('Главное меню', reply_markup=admin_markup.create_start_markup())

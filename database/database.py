@@ -1,3 +1,4 @@
+import datetime
 import sqlite3
 
 
@@ -19,9 +20,12 @@ class Database:
                 messages.append({"role": item[0], "content": item[1]})
         return messages
 
-    def add_bot(self, bot_id: int, token_bot: str, username: str, status: str, prompt: str, voice_id: str, yoomoney_token: str):
+    def add_bot(self, bot_id: int, token_bot: str, username: str, status: str, prompt: str, voice_id: str, yoomoney_token: str, price_per_minute: str):
         with self.connection:
-            return self.cursor.execute("INSERT INTO bots (bot_id, token_bot, bot_username, status, prompt, voice_id, yoomoney_token) VALUES (?, ?, ?, ?, ?, ?, ?)", (bot_id, token_bot, username, status, prompt, voice_id, yoomoney_token)).lastrowid
+            return self.cursor.execute("INSERT INTO bots (bot_id, token_bot, bot_username, status, prompt, voice_id, "
+                                       "yoomoney_token, price_per_minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                       (bot_id, token_bot, username, status, prompt, voice_id, yoomoney_token,
+                                        price_per_minute)).lastrowid
 
     def get_bots(self):
         with self.connection:
@@ -42,6 +46,10 @@ class Database:
     def get_voice_id(self, bot_id):
         with self.connection:
             return self.cursor.execute("SELECT voice_id FROM bots WHERE bot_id = ?", (bot_id, )).fetchmany(1)
+
+    def get_price_per_minute(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT price_per_minute FROM bots WHERE bot_id = ?", (bot_id, )).fetchmany(1)
 
     def get_total_lenght_by_user(self, user_id, bot_id):
         with self.connection:
@@ -69,6 +77,10 @@ class Database:
         with self.connection:
             self.cursor.execute("UPDATE bots SET yoomoney_token = ? WHERE bot_id = ?", (new_yoomoney_token, bot_id))
 
+    def update_price_per_minute(self, bot_id, price_per_minute):
+        with self.connection:
+            self.cursor.execute("UPDATE bots SET price_per_minute = ? WHERE bot_id = ?", (price_per_minute, bot_id))
+
     def update_voice_id(self, bot_id, voice_id):
         with self.connection:
             self.cursor.execute("UPDATE bots SET voice_id = ? WHERE bot_id = ?", (voice_id, bot_id))
@@ -89,3 +101,24 @@ class Database:
     def delete_rate(self, rate_id):
         with self.connection:
             self.cursor.execute("DELETE FROM rates WHERE rate_id = ?", (rate_id, ))
+
+    def get_minutes_by_user(self, bot_id, user_id):
+        with self.connection:
+            return self.cursor.execute("SELECT count_minutes FROM users WHERE bot_id = ? AND user_id = ?", (bot_id, user_id)).fetchmany(1)[0][0]
+
+    def get_count_minutes_by_rate(self, rate_id):
+        with self.connection:
+            return self.cursor.execute("SELECT bot_id, count_minutes FROM rates WHERE rate_id = ?", (rate_id, )).fetchmany(1)
+
+    def add_minutes(self, user_id, bot_id, count_minutes):
+        with self.connection:
+            self.cursor.execute("UPDATE users SET count_minutes = count_minutes + ? WHERE user_id = ? AND bot_id = ?", (count_minutes, user_id, bot_id))
+
+    def add_payment(self, payment_id, user_id, amount):
+        with self.connection:
+            self.cursor.execute("INSERT INTO payments (payment_id, user_id, payment_datetime, amount) VALUES (?, ?, ?, ?)",
+                                (payment_id, user_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), amount))
+    def get_yoomoney_token(self, rate_id):
+        with self.connection:
+            bot_id = self.cursor.execute("SELECT bot_id FROM rates WHERE rate_id = ?", (rate_id, )).fetchmany(1)[0][0]
+            return self.cursor.execute("SELECT yoomoney_token FROM bots WHERE bot_id = ?", (bot_id, )).fetchmany(1)[0][0]

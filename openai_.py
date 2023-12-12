@@ -1,7 +1,7 @@
 import asyncio
 
 from openai import AsyncOpenAI
-from config import openai_api_key
+from config import openai_api_key, max_tokens
 
 client = AsyncOpenAI(api_key=openai_api_key)
 # openai.api_key = openai_api_key
@@ -14,7 +14,7 @@ class AIGirlfriend:
         response = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=1500,
+            max_tokens=max_tokens,
             top_p=1,
             frequency_penalty=0,
             presence_penalty=0,

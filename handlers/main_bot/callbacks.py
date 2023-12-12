@@ -156,3 +156,13 @@ async def edit_voice_(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Пришли мне новый голос персонажа", reply_markup=admin_markup.create_cancel_markup())
     await state.set_state(FSM.FSMAdmin.get_new_voice)
     await state.set_data({"bot_id": bot_id})
+
+
+
+@callbacks_router.callback_query(F.data.startswith("edit_price_per_minute_"))
+async def edit_price_per_minute_(callback: CallbackQuery, state: FSMContext):
+    bot_id = int(callback.data.split("_")[-1])
+    await callback.message.delete()
+    await callback.message.answer("Пришли мне новую цену за минуту персонажа", reply_markup=admin_markup.create_cancel_markup())
+    await state.set_state(FSM.FSMAdmin.get_new_price_per_minute)
+    await state.set_data({"bot_id": bot_id})
