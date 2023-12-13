@@ -21,7 +21,7 @@ commands_router = Router()
 commands_router.message.middleware.register(ChatActionMiddleware())
 
 
-async def check_media_and_mailing(bot: Bot):
+async def check_media_and_notifications(bot: Bot):
     while True:
         bot_id = (await bot.get_me()).id
         listdir = os.listdir("media")
@@ -74,7 +74,7 @@ async def check_media_and_mailing(bot: Bot):
 
 
 async def on_bot_startup(dispatcher: Dispatcher, bot: Bot):
-    asyncio.create_task(check_media_and_mailing(bot))
+    asyncio.create_task(check_media_and_notifications(bot))
 
 
 @commands_router.message(CommandStart())
