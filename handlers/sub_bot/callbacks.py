@@ -14,13 +14,14 @@ async def payment_successful(callback: CallbackQuery):
     bill_id = callback.data.split("_")[-1]
     rate_id = callback.data.split("_")[-2]
     yoomoney_token = db.get_yoomoney_token(rate_id)[0][0]
+    mark_id = db.get_mark_id_by_user_id(callback.from_user.id)
     wallet = Payment(config.yoomoney_wallet, yoomoney_token)
     status, amount = wallet.check_payment(bill_id)
     if status == 'Оплачено':
         await callback.message.answer("Успешно оплачено!")
         bot_id, count_minutes = db.get_count_minutes_by_rate(rate_id)[0]
         db.add_minutes(callback.from_user.id, bot_id, count_minutes)
-        db.add_payment(bill_id, callback.from_user.id, amount)
+        db.add_payment(bill_id, callback.from_user.id, bot_id, amount, mark_id)
     else:
         await callback.answer("Не оплачено!")
 

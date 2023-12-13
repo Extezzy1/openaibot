@@ -60,10 +60,10 @@ class Database:
             return bool(len(self.cursor.execute("SELECT * FROM users WHERE bot_id = ? AND user_id = ?", (bot_id, user_id)).fetchmany(1)))
             # return self.cursor.execute("SELECT * FROM users WHERE bot_id = ? AND user_id = ?", (bot_id, user_id)).fetchone()
 
-    def add_user(self, bot_id, user_id, username, join_date):
+    def add_user(self, bot_id, user_id, username, full_name):
         with self.connection:
-            self.cursor.execute("INSERT INTO users (user_id, bot_id, username, join_date) VALUES (?, ?, ?, ?)",
-                                (user_id, bot_id, username, join_date))
+            self.cursor.execute("INSERT INTO users (user_id, bot_id, username, join_date, last_message_time, full_name) VALUES (?, ?, ?, ?, ?, ?)",
+                                (user_id, bot_id, username, datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), full_name))
 
     def get_bot_token(self, bot_id):
         with self.connection:
@@ -114,11 +114,95 @@ class Database:
         with self.connection:
             self.cursor.execute("UPDATE users SET count_minutes = count_minutes + ? WHERE user_id = ? AND bot_id = ?", (count_minutes, user_id, bot_id))
 
-    def add_payment(self, payment_id, user_id, amount):
+    def add_payment(self, payment_id, user_id, bot_id, amount, mark_id):
         with self.connection:
-            self.cursor.execute("INSERT INTO payments (payment_id, user_id, payment_datetime, amount) VALUES (?, ?, ?, ?)",
-                                (payment_id, user_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), amount))
+            self.cursor.execute("INSERT INTO payments (payment_id, user_id, payment_datetime, amount, bot_id, mark_id) VALUES (?, ?, ?, ?, ?, ?)",
+                                (payment_id, user_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), amount, bot_id, mark_id))
+
     def get_yoomoney_token(self, rate_id):
         with self.connection:
             bot_id = self.cursor.execute("SELECT bot_id FROM rates WHERE rate_id = ?", (rate_id, )).fetchmany(1)[0][0]
             return self.cursor.execute("SELECT yoomoney_token FROM bots WHERE bot_id = ?", (bot_id, )).fetchmany(1)[0][0]
+
+    def update_start_photo(self, bot_id, file_id):
+        with self.connection:
+            self.cursor.execute("UPDATE bots SET start_photo = ? WHERE bot_id = ?", (file_id, bot_id))
+
+    def update_start_text(self, bot_id, text):
+        with self.connection:
+            self.cursor.execute("UPDATE bots SET start_text = ? WHERE bot_id = ?", (text, bot_id))
+
+    def get_start_message(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT start_text, start_photo FROM bots WHERE bot_id = ?", (bot_id, )).fetchmany(1)
+
+    def update_last_message_time(self, bot_id, user_id):
+        with self.connection:
+            self.cursor.execute("UPDATE users SET last_message_time = ?, is_send_1_hour = 0, is_send_1_day = 0,"
+                                "is_send_2_day = 0, is_send_3_day = 0, is_send_7_day = 0 "
+                                "WHERE bot_id = ? AND user_id = ?",
+                                (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), bot_id, user_id))
+
+    def get_users_for_mailing(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT user_id, last_message_time, is_send_1_hour, is_send_1_day, is_send_2_day, is_send_3_day,"
+                                       "is_send_7_day FROM users WHERE bot_id = ? AND "
+                                       "(is_send_1_hour = 0 OR is_send_1_day = 0 OR is_send_2_day = 0 OR is_send_3_day = 0 OR is_send_7_day = 0)", (bot_id, )).fetchall()
+
+    def update_mailing(self, bot_id, user_id, type_mailing):
+        with self.connection:
+            self.cursor.execute("UPDATE users SET %s = 1 WHERE bot_id = ? AND user_id = ?" % type_mailing, (bot_id, user_id))
+
+    def get_payments(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT payment_datetime, amount FROM payments WHERE bot_id = ?", (bot_id, )).fetchall()
+
+    def get_count_users(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT COUNT(*) FROM users WHERE bot_id = ?", (bot_id, )).fetchmany(1)[0][0]
+
+    def get_count_users_last_30_days(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT COUNT(*) FROM users WHERE bot_id = ? AND date(join_date) >= date('now','-30 day')", (bot_id, )).fetchmany(1)[0][0]
+
+    def add_mark(self, bot_id, name, link):
+        with self.connection:
+            self.cursor.execute("INSERT INTO utm_marks (bot_id, name, link) VALUES (?, ?, ?)", (bot_id, name, link))
+
+    def get_marks(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT * FROM utm_marks WHERE bot_id = ?", (bot_id, )).fetchall()
+
+    def get_mark_by_id(self, mark_id):
+        with self.connection:
+            return self.cursor.execute("SELECT * FROM utm_marks WHERE mark_id = ?", (mark_id, )).fetchmany(1)
+
+    def get_bot_username(self, bot_id):
+        with self.connection:
+            return self.cursor.execute("SELECT bot_username FROM bots WHERE bot_id = ?", (bot_id, )).fetchmany(1)[0][0]
+
+    def get_conversion_by_mark(self, mark_id):
+        with self.connection:
+            return self.cursor.execute("SELECT COUNT(*) FROM users WHERE utm_mark_id = ?", (mark_id, )).fetchmany(1)[0][0]
+
+    def get_bot_id_by_mark(self, mark_id):
+        with self.connection:
+            return self.cursor.execute("SELECT bot_id FROM utm_marks WHERE mark_id = ?", (mark_id, )).fetchmany(1)
+
+    def delete_mark(self, mark_id):
+        with self.connection:
+            return self.cursor.execute("DELETE FROM utm_marks WHERE mark_id = ?", (mark_id, )).fetchmany(1)
+
+    def get_mark_id_by_user_id(self, bot_id, user_id):
+        with self.connection:
+            return self.cursor.execute("SELECT utm_mark_id FROM users WHERE user_id = ? AND bot_id = ?", (user_id, bot_id)).fetchmany(1)[0][0]
+
+    def get_count_buy_by_mark(self, mark_id):
+        with self.connection:
+            return self.cursor.execute("SELECT SUM(amount) FROM payments WHERE mark_id = ?", (mark_id, )).fetchmany(1)[0][0]
+
+    def get_users_by_mark_id(self, mark_id):
+        with self.connection:
+            users_with_payments = self.cursor.execute("SELECT users.user_id, username, join_date, full_name, amount FROM users LEFT JOIN payments ON payments.user_id = users.user_id WHERE users.utm_mark_id = ? AND payments.mark_id = ?", (mark_id, mark_id)).fetchall()
+            all_users = self.cursor.execute("SELECT user_id, username, join_date, full_name FROM users WHERE users.utm_mark_id = ?", (mark_id,)).fetchall()
+            return users_with_payments, all_users

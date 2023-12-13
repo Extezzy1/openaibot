@@ -3,7 +3,7 @@ import datetime
 import os
 import subprocess
 
-from aiogram import Router, Bot, flags
+from aiogram import Router, Bot, flags, Dispatcher
 from aiogram.enums import ChatAction
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
@@ -21,21 +21,88 @@ commands_router = Router()
 commands_router.message.middleware.register(ChatActionMiddleware())
 
 
+async def check_media_and_mailing(bot: Bot):
+    while True:
+        bot_id = (await bot.get_me()).id
+        listdir = os.listdir("media")
+        for file in listdir:
+            if file.split("_")[0] == str(bot_id):
+                try:
+                    msg = await bot.send_photo(config.ADMINS[0], photo=FSInputFile(f"media/{file}"))
+                    file_id = msg.photo[-1].file_id
+                    db.update_start_photo(bot_id, file_id)
+                    os.remove(f"media/{file}")
+                except Exception as ex:
+                    print(ex)
+
+        users = db.get_users_for_mailing(bot_id)
+        for user in users:
+            last_message_time = datetime.datetime.strptime(user[1], "%Y-%m-%d %H:%M:%S")
+            if last_message_time + datetime.timedelta(hours=1) < datetime.datetime.now() and user[2] == 0:
+                try:
+                    db.update_mailing(bot_id, user[0], "is_send_1_hour")
+                    await bot.send_message(user[0], config.message_mailing_1_hour)
+                except Exception as ex:
+                    print(ex)
+            elif last_message_time + datetime.timedelta(days=1) < datetime.datetime.now() and user[3] == 0:
+                try:
+                    db.update_mailing(bot_id, user[0], "is_send_1_day")
+                    await bot.send_message(user[0], config.message_mailing_1_day)
+                except Exception as ex:
+                    print(ex)
+            elif last_message_time + datetime.timedelta(days=2) < datetime.datetime.now() and user[3] == 0:
+                try:
+                    db.update_mailing(bot_id, user[0], "is_send_2_day")
+                    await bot.send_message(user[0], config.message_mailing_2_day)
+                except Exception as ex:
+                    print(ex)
+            elif last_message_time + datetime.timedelta(days=3) < datetime.datetime.now() and user[4] == 0:
+                try:
+                    db.update_mailing(bot_id, user[0], "is_send_3_day")
+                    await bot.send_message(user[0], config.message_mailing_3_day)
+                except Exception as ex:
+                    print(ex)
+            elif last_message_time + datetime.timedelta(days=7) < datetime.datetime.now() and user[5] == 0:
+                try:
+                    db.update_mailing(bot_id, user[0], "is_send_7_day")
+                    await bot.send_message(user[0], config.message_mailing_7_day)
+                except Exception as ex:
+                    print(ex)
+
+        await asyncio.sleep(30)
+
+
+
+async def on_bot_startup(dispatcher: Dispatcher, bot: Bot):
+    asyncio.create_task(check_media_and_mailing(bot))
+
+
 @commands_router.message(CommandStart())
 async def start(message: Message, bot: Bot):
     bot_id = (await bot.get_me()).id
     if not db.exist_user(bot_id, message.from_user.id):
-        db.add_user(bot_id, message.from_user.id, message.from_user.username, datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+        db.add_user(bot_id, message.from_user.id, message.from_user.username, message.from_user.full_name)
+    else:
+        db.update_last_message_time(bot_id, message.from_user.id)
+
     prompt = db.get_prompt(bot_id)[0][0]
     if not len(db.get_history_by_user_id(bot_id, message.from_user.id)):
         db.add_row(bot_id, message.from_user.id, "system", prompt)
-    await message.answer("Привет! Напиши мне что-нибудь")
+    start_message = db.get_start_message(bot_id)[0]
+    if start_message[0] is not None:
+
+        if start_message[1] is not None:
+            await message.answer_photo(photo=start_message[1], caption=start_message[0])
+        else:
+            await message.answer(start_message[0])
 
 
 @commands_router.message(flags={"long_operation": "record_voice"})
 async def all_messages(message: Message, bot: Bot):
+
     message_text = message.text
     bot_id = (await bot.get_me()).id
+    db.update_last_message_time(bot_id, message.from_user.id)
     voice_id = db.get_voice_id(bot_id)[0][0]
     total_length = db.get_total_lenght_by_user(message.from_user.id, bot_id)[0][0]
     user_minutes = db.get_minutes_by_user(bot_id, message.from_user.id)

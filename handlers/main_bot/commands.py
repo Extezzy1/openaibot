@@ -1,11 +1,12 @@
 import asyncio
 import os
+import random
+
 import config
 from aiogram import Router, Bot, Dispatcher
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
-
 import elevenlab
 from dispatchers import dp_new_bot, polling_manager
 from db_ import db
@@ -14,6 +15,10 @@ import replicas.replicas_main_bot as replicas
 import FSM
 from polling_manager import add_bot
 
+alphabet_lower = [chr(i) for i in range(97, 123)]
+alphabet_upper = [chr(i) for i in range(65, 91)]
+alphabet_numbers = [chr(i) for i in range(48, 58)]
+alphabet = alphabet_lower + alphabet_upper + alphabet_numbers
 commands_router = Router()
 
 
@@ -36,8 +41,8 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot):
 
 
 @commands_router.message(CommandStart())
-async def start(message: Message):
-
+async def start(message: Message, state: FSMContext):
+    await state.clear()
     if message.from_user.id in config.ADMINS:
         await message.answer("Привет!", reply_markup=admin_markup.create_start_markup())
 
@@ -166,8 +171,9 @@ async def get_voice(message: Message, state: FSMContext, bot: Bot):
         if bot_id:
             db.add_bot(bot_id, token, username, "запущен", prompt, voice_id, token_yoomoney, price_per_minute)
         await message.answer(result)
-        await state.set_state(FSM.FSMAdmin.get_rates)
-        await message.answer("Теперь давай настроим тарифы", reply_markup=admin_markup.create_markup_rates(bot_id))
+
+        await message.answer("Теперь пришли мне текст стартового сообщения для персонажа")
+        await state.set_state(FSM.FSMAdmin.get_start_text)
 
         #     # db.add_row(bot_id, message.from_user.id, "system", prompt)
         # await state.clear()
@@ -183,7 +189,6 @@ async def get_token_bot(message: Message, state: FSMContext):
 
         await state.set_state(FSM.FSMAdmin.get_price_per_minute)
         await message.answer("Пришли мне цену за одну минуту сообщения персонажа")
-
 
     else:
         await message.answer("Токен не прошел проверку, повтори попытку")
@@ -205,6 +210,47 @@ async def get_yoomoney_token(message: Message, state: FSMContext):
     await state.set_data(data)
     await message.answer("Пришли мне голос для персонажа")
     await state.set_state(FSM.FSMAdmin.get_voice)
+
+
+@commands_router.message(FSM.FSMAdmin.get_start_photo)
+async def get_start_photo(message: Message, state: FSMContext, bot: Bot):
+    if message.photo is not None:
+        data = await state.get_data()
+        bot_id = data["token"].split(":")[0]
+        photo = message.photo[-1].file_id
+        file = await bot.get_file(photo)
+        file_path = file.file_path
+        await bot.download_file(file_path, f"media/{bot_id}_{file_path.split('/')[-1]}")
+        await state.set_state(FSM.FSMAdmin.get_rates)
+        await message.answer("Теперь давай настроим тарифы",
+                                      reply_markup=admin_markup.create_markup_rates(bot_id))
+
+    else:
+        await message.answer("Я жду картинку (не забудь поставить галочку на пункте «Сжать изображение»)")
+
+
+@commands_router.message(FSM.FSMAdmin.get_start_text)
+async def get_start_text(message: Message, state: FSMContext):
+    data = await state.get_data()
+    bot_id = data["token"].split(":")[0]
+    db.update_start_text(bot_id, message.text)
+    await message.answer("Добавляем картинку для стартового сообщения?", reply_markup=admin_markup.create_markup_add_start_photo())
+    await state.set_state(FSM.FSMAdmin.get_start_text)
+
+
+@commands_router.message(FSM.FSMAdmin.get_mark_name)
+async def get_mark_name(message: Message, state: FSMContext):
+    name = message.text
+    data = await state.get_data()
+    bot_id = data["bot_id"]
+    bot_username = db.get_bot_username(bot_id)
+    link = f"https://t.me/{bot_username}?start=" + "".join([alphabet[random.randint(0, len(alphabet) - 1)] for i in range(10)])
+    db.add_mark(bot_id, name, link)
+    marks = db.get_marks(bot_id)
+    await message.answer("Успешно добавил новую метку\n\nНастройка системы UTM меток\n\n"
+                         "Выберите UTM метку ниже или создайте новую",
+                         reply_markup=admin_markup.create_markup_choice_marks(bot_id, marks))
+    await state.clear()
 
 
 @commands_router.message(FSM.FSMAdmin.get_new_prompt)

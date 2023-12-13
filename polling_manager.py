@@ -12,6 +12,8 @@ from aiogram.types import User
 from aiogram.utils.backoff import BackoffConfig
 from aiogram.utils.token import TokenValidationError
 
+from handlers.sub_bot.commands import on_bot_startup
+
 logger = logging.getLogger(__name__)
 
 
@@ -137,7 +139,7 @@ async def add_bot(
         polling_manager.start_bot_polling(
             dp=dp_for_new_bot,
             bot=bot,
-            # on_bot_startup=on_bot_startup(bot),
+            on_bot_startup=on_bot_startup(dp_for_new_bot, bot),
             # on_bot_shutdown=on_bot_shutdown(bot),
             polling_manager=polling_manager,
             dp_for_new_bot=dp_for_new_bot,

@@ -8,6 +8,8 @@ class FSMAdmin(StatesGroup):
     get_rates = State()
     get_yoomoney_token = State()
     get_price_per_minute = State()
+    get_start_text = State()
+    get_start_photo = State()
 
     # Редактирование параметров в настройках
     get_new_yoomoney_token = State()
@@ -24,6 +26,8 @@ class FSMAdmin(StatesGroup):
     get_new_count_minutes = State()
     get_new_price = State()
 
+    # Добавление метки
+    get_mark_name = State()
 
 class FSMUser():
     pass
