@@ -30,7 +30,7 @@ async def main():
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     )
-    bots = [Bot(token) for token in TOKENS]
+    bots = [Bot(token, parse_mode="HTML") for token in TOKENS]
     # dp.startup.register(on_startup)
     # dp.shutdown.register(on_shutdown)
     #

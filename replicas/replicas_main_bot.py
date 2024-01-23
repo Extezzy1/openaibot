@@ -1,3 +1,10 @@
 my_character = "Мои персонажи"
 create_character = "Создать персонажа"
 cancel = 'Отмена'
+add_photo = "Добавить фото"
+show_message = "Показать сообщение"
+send = "Отправить"
+cancel_mailing = "Отменить"
+end_add_photo = "Закончить добавление картинок"
+mailing_all = "Всем пользователям"
+mailing_without_subscribe = "Пользователям без акт. подписки"

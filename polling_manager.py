@@ -130,7 +130,7 @@ async def add_bot(
     polling_manager: PollingManager,
 ):
     try:
-        bot = Bot(token_bot)
+        bot = Bot(token_bot, parse_mode="HTML")
 
         if bot.id in polling_manager.polling_tasks:
             return "Такой персонаж уже запущен!", "111", 0
